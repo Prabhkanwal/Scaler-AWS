@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-cs-bg-layout: var(--color-background-layout-main);
+  --color-cs-bg-container: var(--color-background-container-content);
+  --color-cs-border-divider: var(--color-border-divider-default);
+  --color-cs-border-control: var(--color-border-control-default);
+  --color-cs-text-body: var(--color-text-body-default);
+  --color-cs-text-heading: var(--color-text-heading-default);
+  --color-cs-text-link: var(--color-text-link-default);
+  --color-cs-text-link-hover: var(--color-text-link-hover);
+  --color-cs-bg-primary: var(--color-background-button-primary-default);
+  --color-cs-bg-primary-hover: var(--color-background-button-primary-hover);
+  --color-cs-text-primary: var(--color-text-button-primary-default);
+  --color-cs-bg-inverted: var(--color-background-layout-main);
+  --color-cs-border-divider-section: var(--color-border-divider-section);
+  --font-sans: var(--font-open-sans), Arial, Helvetica, sans-serif;
+}
+
+body {
+  /* Dark mode defaults (enforced universally) */
+  --color-background-layout-main: #0f1b2a;
+  --color-background-container-content: #161d27;
+  --color-text-body-default: #ffffff;
+  --color-border-divider-default: #2c384a;
+  --color-border-control-default: #545b64;
+
+  background-color: var(--color-background-layout-main);
+  color: var(--color-text-body-default);
+}
