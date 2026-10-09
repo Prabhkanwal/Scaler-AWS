@@ -39,6 +39,9 @@ def db_record_count(zone_id: int) -> int:
         db.close()
 
 
+# FIX: register the list route with AND without the trailing slash, so no
+# 307 redirect is produced when a proxy (Vercel/Next.js) strips the slash.
+@router.get("", response_model=HostedZoneListResponse, include_in_schema=False)
 @router.get("/", response_model=HostedZoneListResponse)
 def get_hosted_zones(
     search: str | None = None,
@@ -77,6 +80,10 @@ def get_hosted_zone(zone_id: int, db: Session = Depends(get_db)) -> HostedZoneRe
     return _serialize_zone(zone)
 
 
+# FIX: both decorators now share the same response_model/status_code, and the
+# old duplicate plain `@router.post("/")` (which returned 200 and ignored the
+# response model) has been removed.
+@router.post("", response_model=HostedZoneResponse, status_code=201, include_in_schema=False)
 @router.post("/", response_model=HostedZoneResponse, status_code=201)
 def create_hosted_zone(zone_data: HostedZoneCreate, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> HostedZoneResponse:
     try:
