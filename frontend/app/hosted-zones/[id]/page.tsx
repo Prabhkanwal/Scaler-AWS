@@ -27,7 +27,7 @@ interface DNSRecord {
   name: string;
   type: string;
   ttl: number;
-  value: string;
+  values: string[];
   created_at: string;
   updated_at: string | null;
 }
@@ -117,6 +117,7 @@ export default function HostedZoneDetails() {
   }, [zoneId, isAuthenticated, router]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchZone();
   }, [fetchZone]);
 
@@ -157,6 +158,7 @@ export default function HostedZoneDetails() {
   }, [zoneId, isAuthenticated, zone, page, pageSize, debouncedSearch, typeFilter, router]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchRecords();
   }, [fetchRecords]);
 
@@ -184,7 +186,7 @@ export default function HostedZoneDetails() {
         <div className="bg-cs-bg-container border border-[#2c384a] rounded shadow-xl p-6 max-w-sm w-full mx-4">
           <h2 className="text-white text-[16px] font-bold mb-2">Feature Unavailable</h2>
           <p className="text-white text-[13px] mb-6">
-            The "{comingSoonModal}" feature is outside the scope of this assignment and has not been implemented.
+            The &quot;{comingSoonModal}&quot; feature is outside the scope of this assignment and has not been implemented.
           </p>
           <div className="flex justify-end">
             <button onClick={() => setComingSoonModal('')} className="bg-[#3b82f6] hover:bg-[#2563eb] text-white font-bold py-1.5 px-4 rounded text-[13px]">
@@ -494,7 +496,7 @@ export default function HostedZoneDetails() {
                               <td className="px-3 py-3 text-white border-l border-[#2c384a]">Simple</td>
                               <td className="px-3 py-3 text-white border-l border-[#2c384a]">-</td>
                               <td className="px-3 py-3 text-white border-l border-[#2c384a]">No</td>
-                              <td className="px-3 py-3 text-white break-all max-w-sm whitespace-pre-line border-l border-[#2c384a]">{r.value}</td>
+                              <td className="px-3 py-3 text-white break-all max-w-sm whitespace-pre-line border-l border-[#2c384a]">{r.values?.join('\n') || '-'}</td>
                               <td className="px-3 py-3 text-white border-l border-[#2c384a]">{r.ttl}</td>
                               <td className="px-3 py-3 text-white border-l border-[#2c384a]">-</td>
                               <td className="px-3 py-3 text-white border-l border-[#2c384a]">-</td>
@@ -606,20 +608,25 @@ function EditRecordModal({ record, zoneId, onClose, onSuccess }: { record: DNSRe
   const [name, setName] = useState(record.name);
   const [type, setType] = useState(record.type);
   const [ttl, setTtl] = useState(record.ttl);
-  const [value, setValue] = useState(record.value);
+  const [value, setValue] = useState((record.values || []).join('\n'));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !value.trim() || ttl < 1) { setError('Please fill all required fields correctly.'); return; }
+    const parsedValues = value
+      .split(/\r?\n/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    if (!name.trim() || parsedValues.length === 0 || ttl < 1) { setError('Please fill all required fields correctly.'); return; }
     setLoading(true);
     setError('');
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/hosted-zones/${zoneId}/records/${record.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), type, ttl, value: value.trim() }),
+        body: JSON.stringify({ name: name.trim(), type, ttl, values: parsedValues }),
         credentials: 'include'
       });
       if (res.ok) onSuccess();

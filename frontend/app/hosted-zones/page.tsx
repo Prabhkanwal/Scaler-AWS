@@ -34,7 +34,7 @@ export default function HostedZonesPage() {
       if (res.ok) {
         const data = await res.json();
         const zonesWithCounts = await Promise.all(
-          (data.items || []).map(async (zone: any) => {
+          (data.items || []).map(async (zone: HostedZone & { id: number }) => {
             try {
               const recRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/hosted-zones/${zone.id}/records/`, { credentials: 'include' });
               if (recRes.ok) {
@@ -57,6 +57,7 @@ export default function HostedZonesPage() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchZones();
   }, []);
 
@@ -207,8 +208,7 @@ export default function HostedZonesPage() {
                         <td className="px-4 py-3 border-l border-[#2c384a]">{zone.record_count !== undefined ? zone.record_count : 0}</td>
                         <td className="px-4 py-3 border-l border-[#2c384a] text-gray-300">{zone.comment || '-'}</td>
                         <td className="px-4 py-3 border-l border-[#2c384a] text-gray-300">
-                          {/* Format ID to look like AWS */}
-                          Z0{Math.random().toString(36).substring(2, 15).toUpperCase()}
+                          {`Z0${String(zone.id).padStart(12, '0').slice(0, 12).toUpperCase()}`}
                         </td>
                       </tr>
                     ))

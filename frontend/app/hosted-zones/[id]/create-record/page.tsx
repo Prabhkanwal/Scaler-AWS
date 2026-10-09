@@ -84,6 +84,11 @@ export default function CreateRecord({ params }: { params: Promise<{ id: string 
     setIsSubmitting(true);
     try {
       // Create a single record according to the backend schema
+      const values = value
+        .split(/\r?\n/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/hosted-zones/${id}/records/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -91,7 +96,7 @@ export default function CreateRecord({ params }: { params: Promise<{ id: string 
           name: name.trim(),
           type,
           ttl: parseInt(ttl.toString(), 10),
-          value: value.trim()
+          values,
         }),
         credentials: 'include'
       });

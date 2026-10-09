@@ -128,9 +128,9 @@ export default function CreateHostedZone() {
           >
             <p className="mb-3">Enter the name of the domain that you want to route traffic for. Note the following:</p>
             <ul className="list-disc pl-5 mt-3 space-y-3">
-              <li>You can't change the name of a hosted zone after you create it.</li>
+              <li>You can&apos;t change the name of a hosted zone after you create it.</li>
               <li>The name is not case-sensitive, so example.com is the same as EXAMPLE.COM.</li>
-              <li>Except in rare cases, you don't specify the name of a subdomain, such as www.example.com.</li>
+              <li>Except in rare cases, you don&apos;t specify the name of a subdomain, such as www.example.com.</li>
               <li>If the domain name contains characters other than a-z, 0-9, and - (hyphen), see DNS domain name format.</li>
             </ul>
           </InfoPanel>

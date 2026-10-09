@@ -1,5 +1,6 @@
 'use client';
-import React, { useState } from 'react';
+import React, { type ReactNode, useState } from 'react';
+import Link from 'next/link';
 import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useSidebar } from './SidebarContext';
@@ -33,8 +34,8 @@ export default function Sidebar() {
 
       {/* Main Links */}
       <div className="flex flex-col text-[14px] font-medium">
-        <a href="/" className="py-2 pl-5 text-gray-300 hover:text-white hover:bg-[#161d27]">Dashboard</a>
-        <a href="/hosted-zones" className={`py-2 pl-5 font-bold border-l-[3px] ${isHostedZonesActive ? 'text-[#3ea1fc] border-[#3ea1fc] bg-[#161d27]' : 'text-gray-300 border-transparent hover:text-white hover:bg-[#161d27]'}`}>Hosted zones</a>
+        <Link href="/" className="py-2 pl-5 text-gray-300 hover:text-white hover:bg-[#161d27]">Dashboard</Link>
+        <Link href="/hosted-zones" className={`py-2 pl-5 font-bold border-l-[3px] ${isHostedZonesActive ? 'text-[#3ea1fc] border-[#3ea1fc] bg-[#161d27]' : 'text-gray-300 border-transparent hover:text-white hover:bg-[#161d27]'}`}>Hosted zones</Link>
         <a href="#" className="py-2 pl-5 text-gray-300 hover:text-white hover:bg-[#161d27]">Health checks</a>
         <a href="#" className="py-2 pl-5 text-gray-300 hover:text-white hover:bg-[#161d27]">Profiles</a>
       </div>
@@ -106,7 +107,17 @@ export default function Sidebar() {
   );
 }
 
-function SidebarSection({ title, isOpen, onToggle, children }: any) {
+function SidebarSection({
+  title,
+  isOpen,
+  onToggle,
+  children,
+}: {
+  title: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
   return (
     <div className="flex flex-col">
       <div 
@@ -127,7 +138,7 @@ function SidebarSection({ title, isOpen, onToggle, children }: any) {
   );
 }
 
-function SidebarItem({ label, isNew = false }: any) {
+function SidebarItem({ label, isNew = false }: { label: string; isNew?: boolean }) {
   return (
     <a href="#" className="py-1.5 pl-[30px] pr-4 text-[13px] text-gray-300 hover:text-white hover:bg-[#161d27] flex items-center gap-2">
       {label}

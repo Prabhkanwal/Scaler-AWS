@@ -1,135 +1,72 @@
 import secrets
+from datetime import datetime, timedelta, timezone
 
 import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
 
+from ..config import settings
 from ..database import get_db
 from ..models import Session as DBSession
-from ..models import User
-from ..schemas import LoginRequest, UserResponse
+from ..models import User, normalize_utc
+from ..schemas import AuthMeResponse, LoginRequest, UserResponse
 
-
-router = APIRouter(
-    prefix="/api/auth",
-    tags=["Authentication"],
-)
+router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 
 @router.post("/login", response_model=UserResponse)
-def login(
-    login_data: LoginRequest,
-    response: Response,
-    db: Session = Depends(get_db),
-):
-    user = (
-        db.query(User)
-        .filter(User.username == login_data.username)
-        .first()
-    )
-
-    if not user:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid username or password",
-        )
-
-    password_valid = bcrypt.checkpw(
-        login_data.password.encode("utf-8"),
-        user.password_hash.encode("utf-8"),
-    )
-
-    if not password_valid:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid username or password",
-        )
+def login(login_data: LoginRequest, response: Response, db: Session = Depends(get_db)) -> User:
+    user = db.query(User).filter(User.username == login_data.username).first()
+    if not user or not bcrypt.checkpw(login_data.password.encode("utf-8"), user.password_hash.encode("utf-8")):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
 
     session_token = secrets.token_urlsafe(32)
-
-    db_session = DBSession(
-        user_id=user.id,
-        session_token=session_token,
-    )
-
+    expires_at = normalize_utc(datetime.now(timezone.utc) + timedelta(hours=settings.session_ttl_hours))
+    db_session = DBSession(user_id=user.id, session_token=session_token, expires_at=expires_at)
     db.add(db_session)
     db.commit()
 
-    # Create a secure cross-site session cookie
     response.set_cookie(
-        key="route53_session",
+        key=settings.cookie_name,
         value=session_token,
         httponly=True,
-        secure=True,
-        samesite="none",
+        secure=settings.cookie_secure,
+        samesite=settings.cookie_samesite,
+        max_age=int(timedelta(hours=settings.session_ttl_hours).total_seconds()),
     )
-
     return user
 
 
-@router.get("/me", response_model=UserResponse)
-def get_current_user(
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    session_token = request.cookies.get("route53_session")
-
+@router.get("/me", response_model=AuthMeResponse)
+def get_current_user(request: Request, db: Session = Depends(get_db)) -> dict[str, object]:
+    session_token = request.cookies.get(settings.cookie_name)
     if not session_token:
-        raise HTTPException(
-            status_code=401,
-            detail="Not authenticated",
-        )
+        raise HTTPException(status_code=401, detail="Not authenticated")
 
-    db_session = (
-        db.query(DBSession)
-        .filter(DBSession.session_token == session_token)
-        .first()
-    )
-
+    db_session = db.query(DBSession).filter(DBSession.session_token == session_token).first()
     if not db_session:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid session",
-        )
+        raise HTTPException(status_code=401, detail="Invalid session")
 
-    user = (
-        db.query(User)
-        .filter(User.id == db_session.user_id)
-        .first()
-    )
+    if normalize_utc(db_session.expires_at) <= datetime.now(timezone.utc):
+        db.delete(db_session)
+        db.commit()
+        raise HTTPException(status_code=401, detail="Session expired")
 
+    user = db.query(User).filter(User.id == db_session.user_id).first()
     if not user:
-        raise HTTPException(
-            status_code=401,
-            detail="User not found",
-        )
+        raise HTTPException(status_code=401, detail="User not found")
 
-    return user
+    return {"user": user, "account_id": user.account_id, "region": "us-east-1"}
 
 
 @router.post("/logout")
-def logout(
-    request: Request,
-    response: Response,
-    db: Session = Depends(get_db),
-):
-    session_token = request.cookies.get("route53_session")
-
+def logout(request: Request, response: Response, db: Session = Depends(get_db)) -> dict[str, str]:
+    session_token = request.cookies.get(settings.cookie_name)
     if session_token:
-        db_session = (
-            db.query(DBSession)
-            .filter(DBSession.session_token == session_token)
-            .first()
-        )
-
-        if db_session:
-            db.delete(db_session)
+        session = db.query(DBSession).filter(DBSession.session_token == session_token).first()
+        if session:
+            db.delete(session)
             db.commit()
+    response.delete_cookie(key=settings.cookie_name)
+    return {"message": "Logged out successfully"}
 
-    response.delete_cookie(
-        key="route53_session",
-    )
-
-    return {
-        "message": "Logged out successfully"
-    }
