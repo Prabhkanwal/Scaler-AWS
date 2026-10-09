@@ -38,7 +38,7 @@ export default function EditHostedZone({ params }: { params: Promise<{ id: strin
   useEffect(() => {
     const checkAuthAndFetchZone = async () => {
       try {
-        const authRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/me`, {
+        const authRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/auth/me`, {
           credentials: 'include',
         });
         if (authRes.ok) {
@@ -48,13 +48,13 @@ export default function EditHostedZone({ params }: { params: Promise<{ id: strin
           return;
         }
 
-        const zoneRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/hosted-zones/${id}`, {
+        const zoneRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/hosted-zones/${id}`, {
           credentials: 'include'
         });
         if (zoneRes.ok) {
           const data = await zoneRes.json();
           try {
-            const recRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/hosted-zones/${id}/records`, { credentials: 'include' });
+            const recRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/hosted-zones/${id}/records`, { credentials: 'include' });
             if (recRes.ok) {
               const recData = await recRes.json();
               data.record_count = recData.total !== undefined ? recData.total : (recData.items?.length || 0);
@@ -95,7 +95,7 @@ export default function EditHostedZone({ params }: { params: Promise<{ id: strin
 
     setIsSubmitting(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/hosted-zones/${id}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/hosted-zones/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

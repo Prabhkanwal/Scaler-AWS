@@ -28,7 +28,7 @@ export default function HostedZonesPage() {
   const fetchZones = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/hosted-zones/`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/hosted-zones/`, {
         credentials: 'include'
       });
       if (res.ok) {
@@ -36,7 +36,7 @@ export default function HostedZonesPage() {
         const zonesWithCounts = await Promise.all(
           (data.items || []).map(async (zone: HostedZone & { id: number }) => {
             try {
-              const recRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/hosted-zones/${zone.id}/records/`, { credentials: 'include' });
+              const recRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/hosted-zones/${zone.id}/records/`, { credentials: 'include' });
               if (recRes.ok) {
                 const recData = await recRes.json();
                 return { ...zone, record_count: recData.total !== undefined ? recData.total : (recData.items?.length || 0) };
@@ -246,7 +246,7 @@ function DeleteZoneModal({ zone, onClose, onSuccess }: { zone: HostedZone; onClo
     if (confirmText.toLowerCase() !== 'delete') return;
     setLoading(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/hosted-zones/${zone.id}`, { method: 'DELETE', credentials: 'include' });
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/hosted-zones/${zone.id}`, { method: 'DELETE', credentials: 'include' });
       if (res.ok) onSuccess();
       else setError('Failed to delete zone.');
     } catch {

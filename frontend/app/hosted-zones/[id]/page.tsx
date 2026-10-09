@@ -79,7 +79,7 @@ export default function HostedZoneDetails() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/me`, { credentials: 'include' });
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/auth/me`, { credentials: 'include' });
         if (res.ok) {
           setIsAuthenticated(true);
         } else {
@@ -98,7 +98,7 @@ export default function HostedZoneDetails() {
     setIsLoadingZone(true);
     setGlobalError('');
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/hosted-zones/${zoneId}`, { credentials: 'include' });
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/hosted-zones/${zoneId}`, { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         setZone(data);
@@ -135,7 +135,7 @@ export default function HostedZoneDetails() {
     if (!isAuthenticated || !zone) return;
     setIsLoadingRecords(true);
     try {
-      const url = new URL(`${process.env.NEXT_PUBLIC_API_URL}/api/hosted-zones/${zoneId}/records/`);
+      const url = new URL(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/hosted-zones/${zoneId}/records/`, window.location.origin);
       url.searchParams.append('page', page.toString());
       url.searchParams.append('page_size', pageSize.toString());
       if (debouncedSearch) url.searchParams.append('search', debouncedSearch);
@@ -553,7 +553,7 @@ function DeleteZoneModal({ zone, onClose }: { zone: HostedZone; onClose: () => v
     if (confirmText.toLowerCase() !== 'delete') return;
     setLoading(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/hosted-zones/${zone.id}`, { method: 'DELETE', credentials: 'include' });
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/hosted-zones/${zone.id}`, { method: 'DELETE', credentials: 'include' });
       if (res.ok) router.push('/hosted-zones');
       else setError('Failed to delete zone.');
     } catch {
@@ -623,7 +623,7 @@ function EditRecordModal({ record, zoneId, onClose, onSuccess }: { record: DNSRe
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/hosted-zones/${zoneId}/records/${record.id}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/hosted-zones/${zoneId}/records/${record.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim(), type, ttl, values: parsedValues }),
@@ -690,7 +690,7 @@ function DeleteRecordModal({ records, zoneId, onClose, onSuccess }: { records: D
     setLoading(true);
     try {
       await Promise.all(records.map(r =>
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/hosted-zones/${zoneId}/records/${r.id}`, { method: 'DELETE', credentials: 'include' })
+        fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/hosted-zones/${zoneId}/records/${r.id}`, { method: 'DELETE', credentials: 'include' })
       ));
       onSuccess();
     } catch {

@@ -43,7 +43,7 @@ export default function CreateRecord({ params }: { params: Promise<{ id: string 
   useEffect(() => {
     const checkAuthAndFetchZone = async () => {
       try {
-        const authRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/me`, {
+        const authRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/auth/me`, {
           credentials: 'include',
         });
         if (authRes.ok) {
@@ -53,7 +53,7 @@ export default function CreateRecord({ params }: { params: Promise<{ id: string 
           return;
         }
 
-        const zoneRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/hosted-zones/${id}`, {
+        const zoneRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/hosted-zones/${id}`, {
           credentials: 'include'
         });
         if (zoneRes.ok) {
@@ -89,7 +89,7 @@ export default function CreateRecord({ params }: { params: Promise<{ id: string 
         .map((item) => item.trim())
         .filter(Boolean);
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/hosted-zones/${id}/records/`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/hosted-zones/${id}/records/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
