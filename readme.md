@@ -18,7 +18,7 @@ infrastructure.
 
 ## Live Demo
 
-**Hosted application:** `https://route53-psi.vercel.app/signin`
+**Hosted application:** `scaler-aws-gray.vercel.app`
 **Deployed Backend:** `https://route53-production.up.railway.app/`
 
 ------------------------------------------------------------------------
