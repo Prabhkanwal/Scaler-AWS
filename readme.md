@@ -778,6 +778,49 @@ admin123
 
 ------------------------------------------------------------------------
 
+# Production Deployment (SQLite)
+
+Vercel Functions do not provide persistent writable disk storage for a SQLite
+database. Deploy the FastAPI backend on Railway with a persistent volume, and
+deploy only the Next.js frontend on Vercel. The frontend proxies `/api/*` to the
+backend so the browser keeps using same-origin HTTP-only session cookies.
+
+## Deploy the backend on Railway
+
+1. Create a Railway project from this GitHub repository and set the service root
+  directory to `/backend`.
+2. Add a Railway volume to the backend service and set its mount path to `/data`.
+3. Set these backend service variables:
+
+  ```text
+  DATABASE_URL=sqlite:////data/route53.db
+  SEED_ON_START=true
+  COOKIE_SECURE=true
+  COOKIE_SAMESITE=lax
+  ```
+
+  Keep the Railway config file at `backend/railway.json`. It starts FastAPI and
+  configures Railway's `/health` health check. Generate a public domain for the
+  backend service. Keep the service to one replica when using SQLite.
+
+## Deploy the frontend on Vercel
+
+1. Import the same repository and deploy the latest branch. The root
+  `vercel.json` configures Vercel to build only the frontend service.
+2. Set `BACKEND_URL` in the Vercel project's Production environment to the
+  Railway backend origin, for example `https://your-service.up.railway.app`.
+  Do not add a path or trailing slash.
+3. Remove `NEXT_PUBLIC_API_URL` from Vercel's Production variables so browser
+  requests use the same-origin `/api/*` proxy. Redeploy after changing the
+  environment variables.
+
+Check `https://your-vercel-domain/api/health`; it should return
+`{"status":"ok"}`. Then sign in using the demo credentials above. The first
+backend startup creates the SQLite schema and seeds the demo account on the
+persistent volume.
+
+------------------------------------------------------------------------
+
 # End-to-End Workflow
 
 A typical evaluation flow is:
