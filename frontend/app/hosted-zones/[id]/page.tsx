@@ -14,11 +14,13 @@ import {
 // --- Interfaces ---
 interface HostedZone {
   id: number;
+  zone_id: string;
   name: string;
   type: 'public' | 'private';
   comment: string | null;
   created_at: string;
   updated_at: string | null;
+  tags: Array<{ key: string; value: string }>;
 }
 
 interface DNSRecord {
@@ -26,8 +28,15 @@ interface DNSRecord {
   hosted_zone_id: number;
   name: string;
   type: string;
-  ttl: number;
+  ttl: number | null;
   values: string[];
+  routing_policy: string;
+  set_identifier: string | null;
+  is_alias: boolean;
+  alias_target: string | null;
+  health_check_id: string | null;
+  evaluate_target_health: boolean;
+  is_default: boolean;
   created_at: string;
   updated_at: string | null;
 }
@@ -49,11 +58,13 @@ export default function HostedZoneDetails() {
   // State: Pagination & Filters
   const [totalRecords, setTotalRecords] = useState(0);
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(20);
   const [totalPages, setTotalPages] = useState(1);
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  const [routingPolicyFilter, setRoutingPolicyFilter] = useState('');
+  const [aliasFilter, setAliasFilter] = useState('');
 
   // State: UI
   const [isLoadingZone, setIsLoadingZone] = useState(true);
@@ -140,6 +151,8 @@ export default function HostedZoneDetails() {
       url.searchParams.append('page_size', pageSize.toString());
       if (debouncedSearch) url.searchParams.append('search', debouncedSearch);
       if (typeFilter) url.searchParams.append('type', typeFilter);
+      if (routingPolicyFilter) url.searchParams.append('routing_policy', routingPolicyFilter);
+      if (aliasFilter) url.searchParams.append('is_alias', aliasFilter);
 
       const res = await fetch(url.toString(), { credentials: 'include' });
       if (res.ok) {
@@ -155,7 +168,7 @@ export default function HostedZoneDetails() {
     } finally {
       setIsLoadingRecords(false);
     }
-  }, [zoneId, isAuthenticated, zone, page, pageSize, debouncedSearch, typeFilter, router]);
+  }, [zoneId, isAuthenticated, zone, page, pageSize, debouncedSearch, typeFilter, routingPolicyFilter, aliasFilter, router]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -307,7 +320,7 @@ export default function HostedZoneDetails() {
                       </div>
                       <div>
                         <p className="text-gray-400 mb-1">Hosted zone ID</p>
-                        <p className="text-white">Z0{String(zone.id).padStart(13, 'A')}BCDEF</p>
+                        <p className="text-white">{zone.zone_id}</p>
                       </div>
                       <div>
                         <p className="text-gray-400 mb-1">Type</p>
@@ -347,10 +360,10 @@ export default function HostedZoneDetails() {
                   DNSSEC signing
                 </button>
                 <button
-                  className="pb-3 text-[14px] font-bold text-white hover:text-cs-text-link border-b-[3px] border-transparent"
-                  onClick={() => setComingSoonModal('Hosted zone tags')}
+                  className={`pb-3 text-[14px] font-bold border-b-[3px] transition-colors ${activeTab === 'tags' ? 'border-[#3ea1fc] text-cs-text-link' : 'border-transparent text-white hover:text-cs-text-link'}`}
+                  onClick={() => setActiveTab('tags')}
                 >
-                  Hosted zone tags (0)
+                          Hosted zone tags ({zone.tags?.length ?? 0})
                 </button>
               </div>
 
@@ -361,7 +374,7 @@ export default function HostedZoneDetails() {
                     <div>
                       <div className="flex items-center gap-2 mb-2">
                         <h2 className="text-white text-[18px] font-bold">Records</h2>
-                        <span className="text-white text-[18px]">({records.length})</span>
+                        <span className="text-white text-[18px]">({totalRecords})</span>
                         <span className="text-[#3ea1fc] text-[12px] font-bold cursor-pointer hover:underline mt-0.5" onClick={() => setActiveInfoPanel('records')}>Info</span>
                       </div>
                       <p className="text-white text-[13px]">
@@ -417,20 +430,24 @@ export default function HostedZoneDetails() {
                           <option value="PTR">PTR</option>
                           <option value="SRV">SRV</option>
                           <option value="CAA">CAA</option>
+                          <option value="SOA">SOA</option>
                         </select>
                         <ChevronDown size={14} className="absolute right-3 top-2 text-white pointer-events-none" />
                       </div>
-                      <div className="relative opacity-50 cursor-not-allowed hidden md:block">
-                        <select disabled className="bg-[#161d27] border border-[#2c384a] text-white text-[13px] rounded-full pl-4 pr-8 py-1 appearance-none">
-                          <option>Routing p...</option>
+                      <div className="relative hidden md:block">
+                        <select value={routingPolicyFilter} onChange={event => { setRoutingPolicyFilter(event.target.value); setPage(1); }} aria-label="Filter by routing policy" className="bg-[#161d27] border border-[#2c384a] text-white text-[13px] rounded-full pl-4 pr-8 py-1 appearance-none">
+                          <option value="">Routing policy</option>
+                          {['simple', 'weighted', 'latency', 'failover', 'geolocation', 'multivalue'].map(policy => <option key={policy} value={policy}>{policy}</option>)}
                         </select>
-                        <ChevronDown size={14} className="absolute right-3 top-2 text-white" />
+                        <ChevronDown size={14} className="absolute right-3 top-2 text-white pointer-events-none" />
                       </div>
-                      <div className="relative opacity-50 cursor-not-allowed hidden md:block">
-                        <select disabled className="bg-[#161d27] border border-[#2c384a] text-white text-[13px] rounded-full pl-4 pr-8 py-1 appearance-none">
-                          <option>Alias</option>
+                      <div className="relative hidden md:block">
+                        <select value={aliasFilter} onChange={event => { setAliasFilter(event.target.value); setPage(1); }} aria-label="Filter by alias" className="bg-[#161d27] border border-[#2c384a] text-white text-[13px] rounded-full pl-4 pr-8 py-1 appearance-none">
+                          <option value="">Alias</option>
+                          <option value="true">Yes</option>
+                          <option value="false">No</option>
                         </select>
-                        <ChevronDown size={14} className="absolute right-3 top-2 text-white" />
+                        <ChevronDown size={14} className="absolute right-3 top-2 text-white pointer-events-none" />
                       </div>
                     </div>
                     {/* Pagination */}
@@ -456,6 +473,9 @@ export default function HostedZoneDetails() {
                           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                         </svg>
                       </button>
+                      <select aria-label="Records per page" value={pageSize} onChange={event => { setPageSize(Number(event.target.value)); setPage(1); }} className="bg-[#161d27] border border-[#2c384a] rounded px-2 py-1 text-white">
+                        {[10, 20, 50, 100].map(size => <option key={size} value={size}>{size} rows</option>)}
+                      </select>
                     </div>
                   </div>
 
@@ -465,7 +485,7 @@ export default function HostedZoneDetails() {
                       <thead className="border-t border-b border-[#2c384a] text-white">
                         <tr>
                           <th className="px-3 py-2 w-8 border-l border-[#2c384a] first:border-0 text-center">
-                            <input type="checkbox" className="accent-[#3ea1fc] cursor-pointer" checked={records.length > 0 && selectedRecords.length === records.length} onChange={(e) => setSelectedRecords(e.target.checked ? [...records] : [])} />
+                            <input type="checkbox" aria-label="Select all records on page" className="accent-[#3ea1fc] cursor-pointer" checked={records.length > 0 && records.every(record => selectedRecords.some(selected => selected.id === record.id))} onChange={(e) => setSelectedRecords(current => e.target.checked ? [...current.filter(selected => !records.some(record => record.id === selected.id)), ...records] : current.filter(selected => !records.some(record => record.id === selected.id)))} />
                           </th>
                           <th className="px-3 py-2 font-normal whitespace-nowrap border-l border-[#2c384a]">Record name <span className="text-[10px] ml-1">▼</span></th>
                           <th className="px-3 py-2 font-normal whitespace-nowrap border-l border-[#2c384a]">Type <span className="text-[10px] ml-1">▼</span></th>
@@ -482,28 +502,28 @@ export default function HostedZoneDetails() {
                       </thead>
                       <tbody className="divide-y divide-[#2c384a]">
                         {isLoadingRecords ? (
-                          <tr><td colSpan={6} className="px-4 py-8 text-center text-white">Loading records...</td></tr>
+                          <tr><td colSpan={12} className="px-4 py-8 text-center text-white">Loading records...</td></tr>
                         ) : records.length === 0 ? (
-                          <tr><td colSpan={6} className="px-4 py-8 text-center text-white">No records found.</td></tr>
+                          <tr><td colSpan={12} className="px-4 py-8 text-center text-white">No records found.</td></tr>
                         ) : (
                           records.map((r) => (
                             <tr key={r.id} className="hover:bg-cs-border-divider/30 transition-colors">
                               <td className="px-3 py-3 border-l border-[#2c384a] first:border-0 text-center">
-                                <input type="checkbox" className="accent-[#3ea1fc] cursor-pointer" checked={selectedRecords.some(sr => sr.id === r.id)} onChange={(e) => { e.stopPropagation(); setSelectedRecords(prev => prev.some(sr => sr.id === r.id) ? prev.filter(sr => sr.id !== r.id) : [...prev, r]); }} />
+                                <input type="checkbox" aria-label={`Select ${r.name} ${r.type}`} disabled={r.is_default} className="accent-[#3ea1fc] cursor-pointer disabled:opacity-40" checked={selectedRecords.some(sr => sr.id === r.id)} onChange={(e) => { e.stopPropagation(); setSelectedRecords(prev => prev.some(sr => sr.id === r.id) ? prev.filter(sr => sr.id !== r.id) : [...prev, r]); }} />
                               </td>
                               <td className="px-3 py-3 text-white border-l border-[#2c384a]">{r.name}</td>
                               <td className="px-3 py-3 text-white border-l border-[#2c384a]">{r.type}</td>
-                              <td className="px-3 py-3 text-white border-l border-[#2c384a]">Simple</td>
-                              <td className="px-3 py-3 text-white border-l border-[#2c384a]">-</td>
-                              <td className="px-3 py-3 text-white border-l border-[#2c384a]">No</td>
-                              <td className="px-3 py-3 text-white break-all max-w-sm whitespace-pre-line border-l border-[#2c384a]">{r.values?.join('\n') || '-'}</td>
-                              <td className="px-3 py-3 text-white border-l border-[#2c384a]">{r.ttl}</td>
-                              <td className="px-3 py-3 text-white border-l border-[#2c384a]">-</td>
-                              <td className="px-3 py-3 text-white border-l border-[#2c384a]">-</td>
-                              <td className="px-3 py-3 text-white border-l border-[#2c384a]">-</td>
+                              <td className="px-3 py-3 text-white border-l border-[#2c384a] capitalize">{r.routing_policy}</td>
+                              <td className="px-3 py-3 text-white border-l border-[#2c384a]">{r.set_identifier || '-'}</td>
+                              <td className="px-3 py-3 text-white border-l border-[#2c384a]">{r.is_alias ? `Yes${r.alias_target ? `: ${r.alias_target}` : ''}` : 'No'}</td>
+                              <td className="px-3 py-3 text-white break-all max-w-sm whitespace-pre-line border-l border-[#2c384a]">{r.is_alias ? r.alias_target : r.values?.join('\n') || '-'}</td>
+                              <td className="px-3 py-3 text-white border-l border-[#2c384a]">{r.ttl ?? '-'}</td>
+                              <td className="px-3 py-3 text-white border-l border-[#2c384a]">{r.health_check_id || '-'}</td>
+                              <td className="px-3 py-3 text-white border-l border-[#2c384a]">{r.is_alias ? (r.evaluate_target_health ? 'Yes' : 'No') : '-'}</td>
+                              <td className="px-3 py-3 text-white border-l border-[#2c384a]">{r.id}</td>
                               <td className="px-3 py-3 text-right border-l border-[#2c384a]">
-                                <button onClick={() => setRecordToEdit(r)} className="text-[#3ea1fc] hover:underline font-bold mr-4">Edit</button>
-                                <button onClick={() => setRecordsToDelete([r])} className="text-[#3ea1fc] hover:underline font-bold">Delete</button>
+                                {!r.is_default && <button onClick={() => setRecordToEdit(r)} className="text-[#3ea1fc] hover:underline font-bold mr-4">Edit</button>}
+                                {!r.is_default && <button onClick={() => setRecordsToDelete([r])} className="text-[#3ea1fc] hover:underline font-bold">Delete</button>}
                               </td>
                             </tr>
                           ))
@@ -511,6 +531,17 @@ export default function HostedZoneDetails() {
                       </tbody>
                     </table>
                   </div>
+                </div>
+              )}
+              {activeTab === 'tags' && (
+                <div className="bg-cs-bg-container border border-[#2c384a] rounded-lg p-4">
+                  <h2 className="text-white text-[18px] font-bold mb-4">Hosted zone tags</h2>
+                  {zone.tags?.length ? (
+                    <table className="w-full text-left text-[13px]">
+                      <thead className="text-gray-300 border-b border-[#2c384a]"><tr><th className="py-2">Key</th><th className="py-2">Value</th></tr></thead>
+                      <tbody className="text-white">{zone.tags.map(tag => <tr key={tag.key} className="border-b border-[#2c384a]"><td className="py-3">{tag.key}</td><td className="py-3">{tag.value}</td></tr>)}</tbody>
+                    </table>
+                  ) : <p className="text-gray-300 text-[13px]">No tags associated with this hosted zone.</p>}
                 </div>
               )}
             </>
@@ -607,7 +638,7 @@ function DeleteZoneModal({ zone, onClose }: { zone: HostedZone; onClose: () => v
 function EditRecordModal({ record, zoneId, onClose, onSuccess }: { record: DNSRecord; zoneId: number; onClose: () => void; onSuccess: () => void; }) {
   const [name, setName] = useState(record.name);
   const [type, setType] = useState(record.type);
-  const [ttl, setTtl] = useState(record.ttl);
+  const [ttl, setTtl] = useState(record.ttl ?? 300);
   const [value, setValue] = useState((record.values || []).join('\n'));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -689,9 +720,15 @@ function DeleteRecordModal({ records, zoneId, onClose, onSuccess }: { records: D
     if (confirmText.toLowerCase() !== 'delete') return;
     setLoading(true);
     try {
-      await Promise.all(records.map(r =>
+      const responses = await Promise.all(records.map(r =>
         fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/hosted-zones/${zoneId}/records/${r.id}`, { method: 'DELETE', credentials: 'include' })
       ));
+      const failedResponse = responses.find(response => !response.ok);
+      if (failedResponse) {
+        const data = await failedResponse.json().catch(() => null);
+        setError(data?.detail || 'One or more records could not be deleted. Refresh and try again.');
+        return;
+      }
       onSuccess();
     } catch {
       setError('Network error.');

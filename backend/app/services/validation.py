@@ -35,30 +35,26 @@ def generate_zone_id() -> str:
 
 def normalize_record_name(name: str, zone_name: str) -> str:
     cleaned = (name or "").strip().lower()
-    zone_name = zone_name.strip().lower()
+    zone_name = normalize_zone_name(zone_name)
+    zone_body = zone_name[:-1]
     if not cleaned or cleaned in {"@", "*"}:
-        return zone_name if zone_name.endswith(".") else zone_name + "."
-    if cleaned.startswith("*."):
-        suffix = cleaned[2:]
-        if not suffix:
-            return f"*.{zone_name}"
-        if suffix.endswith("."):
-            suffix = suffix[:-1]
-        if suffix == zone_name.rstrip("."):
-            return zone_name
-        if suffix.endswith("." + zone_name.rstrip(".")):
-            return f"*.{suffix}."
-        return f"*.{suffix}.{zone_name.rstrip('.')}."
+        return zone_name
+
     if cleaned.endswith("."):
         candidate = cleaned
+    elif cleaned == zone_body or cleaned.endswith("." + zone_body):
+        candidate = cleaned + "."
     else:
-        candidate = cleaned if "." in cleaned else f"{cleaned}.{zone_name.rstrip('.')}"
-        if not candidate.endswith("."):
-            candidate += "."
-    candidate = candidate.lower()
-    if candidate == zone_name:
-        return zone_name
-    if not candidate.endswith("." + zone_name.rstrip(".")) and not candidate.endswith(zone_name.rstrip(".")):
+        candidate = f"{cleaned}.{zone_body}."
+
+    candidate_body = candidate[:-1]
+    labels = candidate_body.split(".")
+    if len(candidate_body) > 253 or any(
+        not label or len(label) > 63 or not re.fullmatch(r"[a-z0-9_*_-]+", label)
+        for label in labels
+    ):
+        raise ValueError("Record name contains invalid DNS labels")
+    if candidate != zone_name and not candidate.endswith("." + zone_name):
         raise ValueError("Record name must be within the hosted zone")
     return candidate
 
@@ -126,10 +122,21 @@ def validate_dns_values(record_type: str, values: list[str], zone_name: str | No
             raise ValueError("CNAME cannot be created at the zone apex")
         if not is_valid_hostname(candidate):
             raise ValueError(f"{candidate!r} is not a valid hostname")
-    elif record_type in {"TXT", "CAA"}:
+    elif record_type == "TXT":
         for item in values:
             if not item:
                 raise ValueError("Values cannot be empty")
+    elif record_type == "CAA":
+        for item in values:
+            parts = item.split(maxsplit=2)
+            if len(parts) != 3:
+                raise ValueError("CAA values must be in the format 'flags tag value'")
+            try:
+                flags = int(parts[0])
+            except ValueError as exc:
+                raise ValueError("CAA flags must be an integer") from exc
+            if not 0 <= flags <= 255 or not re.fullmatch(r"[a-z0-9-]+", parts[1], re.IGNORECASE) or not parts[2]:
+                raise ValueError("CAA values must contain valid flags, tag, and value")
     elif record_type == "MX":
         for item in values:
             parts = item.split()

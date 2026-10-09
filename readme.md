@@ -886,12 +886,14 @@ Delete the record and verify that it disappears from the table.
 
 ### 9. Edit the hosted zone
 
-Update the hosted-zone name/type/comment.
+Update the hosted-zone description and tags. The domain name and zone type are
+immutable after creation, as in the Route 53 console.
 
 ### 10. Delete the hosted zone
 
-Delete the zone and verify that the hosted zone and associated records
-are removed.
+Delete the zone after removing non-default records. Route 53 does not allow a
+hosted zone to be deleted while user-created records remain; default NS and SOA
+records are removed with the zone.
 
 ------------------------------------------------------------------------
 
@@ -909,10 +911,15 @@ from **visual-only Route 53 sections**.
 -   Hosted zone CRUD
 -   Hosted zone search
 -   Hosted zone pagination
+-   Hosted-zone tags and VPC associations persisted in SQLite
+-   Hosted-zone tag editing and details view
 -   DNS record CRUD
 -   DNS record search
 -   DNS record type filtering
+-   DNS record routing-policy and alias filters
 -   DNS record pagination
+-   Protected default NS/SOA records
+-   Route 53-style Coming Soon pages for mocked navigation sections
 -   SQLite persistence
 -   FastAPI backend
 -   Request validation
@@ -935,7 +942,6 @@ not functionally implemented:
 -   Query logging
 -   DNSSEC
 -   Accelerated recovery
--   Hosted-zone tags
 -   Test record
 -   Other AWS account/infrastructure functionality
 
@@ -961,7 +967,6 @@ It does not:
 -   Implement Route 53 health checks
 -   Implement traffic policies
 -   Implement query logging
--   Persist hosted-zone tags
 -   Import BIND zone files
 -   Export BIND/JSON zone files
 
@@ -971,6 +976,17 @@ stated scope.
 ------------------------------------------------------------------------
 
 # Engineering Decisions
+
+## Running the backend tests
+
+From `backend/`, run:
+
+```bash
+./venv/bin/python -m pytest
+```
+
+The test configuration uses `test_route53.db` and never deletes or modifies the
+local runtime database `route53.db`.
 
 ## Why SQLite?
 

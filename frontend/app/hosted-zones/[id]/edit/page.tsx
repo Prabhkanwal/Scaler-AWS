@@ -11,11 +11,13 @@ import { Menu, ChevronRight } from 'lucide-react';
 
 interface HostedZone {
   id: number;
+  zone_id: string;
   name: string;
   comment: string | null;
   type: 'public' | 'private';
   created_at: string;
   record_count?: number;
+  tags: Array<{ key: string; value: string }>;
 }
 
 export default function EditHostedZone({ params }: { params: Promise<{ id: string }> }) {
@@ -26,6 +28,7 @@ export default function EditHostedZone({ params }: { params: Promise<{ id: strin
 
   const [zone, setZone] = useState<HostedZone | null>(null);
   const [description, setDescription] = useState('');
+  const [tags, setTags] = useState<Array<{ key: string; value: string }>>([]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -66,6 +69,7 @@ export default function EditHostedZone({ params }: { params: Promise<{ id: strin
           }
           setZone(data);
           setDescription(data.comment || '');
+          setTags(data.tags ?? []);
         } else {
           router.push('/hosted-zones');
         }
@@ -92,6 +96,10 @@ export default function EditHostedZone({ params }: { params: Promise<{ id: strin
       setError('Description cannot exceed 256 characters.');
       return;
     }
+    if (tags.some(tag => !tag.key.trim() || !tag.value.trim())) {
+      setError('Enter both a key and value for every tag, or remove the empty tag.');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -101,7 +109,8 @@ export default function EditHostedZone({ params }: { params: Promise<{ id: strin
         body: JSON.stringify({
           name: zone.name,
           type: zone.type,
-          comment: description.trim() || null
+          comment: description.trim() || null,
+          tags: tags.map(tag => ({ key: tag.key.trim(), value: tag.value.trim() })),
         }),
         credentials: 'include'
       });
@@ -203,7 +212,7 @@ export default function EditHostedZone({ params }: { params: Promise<{ id: strin
                 {/* Hosted zone ID (Read-only) */}
                 <div>
                   <label className="block text-cs-text-body text-[13px] font-bold mb-1">Hosted zone ID</label>
-                  <p className="text-cs-text-body text-[13px]">{zone.id}</p>
+                  <p className="text-cs-text-body text-[13px]">{zone.zone_id}</p>
                 </div>
 
                 {/* Record count (Read-only) */}
@@ -257,12 +266,21 @@ export default function EditHostedZone({ params }: { params: Promise<{ id: strin
               </h2>
               <p className="text-cs-text-body text-[13px] mb-4">Apply tags to hosted zones to help organize and identify them.</p>
               
-              <p className="text-cs-text-body text-[13px] mb-4">No tags associated with the resource.</p>
-              
-              <button 
+              {tags.length === 0 && <p className="text-cs-text-body text-[13px] mb-4">No tags associated with the resource.</p>}
+              <div className="space-y-3 mb-4">
+                {tags.map((tag, index) => (
+                  <div key={index} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3">
+                    <input aria-label={`Tag ${index + 1} key`} value={tag.key} maxLength={64} onChange={event => setTags(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, key: event.target.value } : item))} placeholder="Key" className="bg-cs-bg-container border border-[#545b64] rounded px-3 py-2 text-cs-text-body text-[13px]" />
+                    <input aria-label={`Tag ${index + 1} value`} value={tag.value} maxLength={255} onChange={event => setTags(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, value: event.target.value } : item))} placeholder="Value" className="bg-cs-bg-container border border-[#545b64] rounded px-3 py-2 text-cs-text-body text-[13px]" />
+                    <button type="button" onClick={() => setTags(current => current.filter((_, itemIndex) => itemIndex !== index))} className="text-[#3ea1fc] hover:underline text-[13px]">Remove</button>
+                  </div>
+                ))}
+              </div>
+              <button
                 type="button" 
+                disabled={tags.length >= 50}
+                onClick={() => setTags(current => [...current, { key: '', value: '' }])}
                 className="bg-cs-bg-container border border-[#545b64] hover:bg-[#2c384a] hover:text-white dark:hover:bg-[#2c384a] text-cs-text-body font-bold py-1.5 px-4 rounded-full text-[13px] transition-colors"
-                onClick={() => {}}
               >
                 Add tag
               </button>

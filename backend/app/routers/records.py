@@ -1,6 +1,7 @@
 import math
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import String, cast
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -44,10 +45,11 @@ def list_records(
     search: str | None = None,
     record_type: str | None = Query(default=None, alias="type"),
     routing_policy: str | None = None,
+    is_alias: bool | None = None,
     sort_by: str = "created_at",
     sort_order: str = "asc",
-    page: int = 1,
-    page_size: int = 20,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
     zone = db.query(HostedZone).filter(HostedZone.id == zone_id).first()
@@ -59,13 +61,22 @@ def list_records(
         page_size = 20
     query = db.query(DNSRecord).filter(DNSRecord.hosted_zone_id == zone_id)
     if search:
-        query = query.filter(DNSRecord.name.ilike(f"%{search}%"))
+        term = f"%{search}%"
+        query = query.filter(
+            DNSRecord.name.ilike(term)
+            | DNSRecord.type.ilike(term)
+            | DNSRecord.routing_policy.ilike(term)
+            | cast(DNSRecord.values, String).ilike(term)
+        )
     if record_type:
         query = query.filter(DNSRecord.type == record_type.upper())
     if routing_policy:
         query = query.filter(DNSRecord.routing_policy == routing_policy)
+    if is_alias is not None:
+        query = query.filter(DNSRecord.is_alias.is_(is_alias))
 
-    sort_column = getattr(DNSRecord, sort_by, DNSRecord.created_at)
+    sortable_fields = {"name", "type", "ttl", "routing_policy", "created_at", "updated_at"}
+    sort_column = getattr(DNSRecord, sort_by if sort_by in sortable_fields else "created_at")
     query = query.order_by((sort_column.asc() if sort_order.lower() == "asc" else sort_column.desc()))
     total = query.count()
     items = query.offset((page - 1) * page_size).limit(page_size).all()
@@ -94,19 +105,34 @@ def create_record(zone_id: int, record_data: DNSRecordCreate, db: Session = Depe
 
     try:
         normalized_name = normalize_record_name(record_data.name or "", zone.name)
-        if record_data.type != "TXT" and record_data.type != "SOA":
+        if record_data.type != "SOA":
             validate_dns_values(record_data.type.value if hasattr(record_data.type, "value") else str(record_data.type), list(record_data.values), zone.name)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    ensure_policy_fields(
-        str(record_data.type),
-        record_data.routing_policy.value if hasattr(record_data.routing_policy, "value") else str(record_data.routing_policy),
-        record_data.set_identifier,
-        record_data.weight,
-        record_data.region,
-        record_data.failover_role,
-    )
+    try:
+        ensure_policy_fields(
+            record_data.type.value if hasattr(record_data.type, "value") else str(record_data.type),
+            record_data.routing_policy.value if hasattr(record_data.routing_policy, "value") else str(record_data.routing_policy),
+            record_data.set_identifier,
+            record_data.weight,
+            record_data.region,
+            record_data.failover_role,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    try:
+        ensure_policy_fields(
+            str(record_data.type),
+            record_data.routing_policy.value if hasattr(record_data.routing_policy, "value") else str(record_data.routing_policy),
+            record_data.set_identifier,
+            record_data.weight,
+            record_data.region,
+            record_data.failover_role,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     if record_data.is_alias:
         if not record_data.alias_target:
@@ -157,20 +183,33 @@ def update_record(zone_id: int, record_id: int, record_data: DNSRecordUpdate, db
     if record.is_default and record.type in {"NS", "SOA"}:
         raise HTTPException(status_code=400, detail="Default NS and SOA records are protected")
 
+    zone = db.query(HostedZone).filter(HostedZone.id == zone_id).first()
+    if not zone:
+        raise HTTPException(status_code=404, detail="Hosted zone not found")
     try:
-        normalized_name = normalize_record_name(record_data.name or "", db.query(HostedZone).filter(HostedZone.id == zone_id).one().name)
-        validate_dns_values(record_data.type.value if hasattr(record_data.type, "value") else str(record_data.type), list(record_data.values), db.query(HostedZone).filter(HostedZone.id == zone_id).one().name)
+        normalized_name = normalize_record_name(record_data.name or "", zone.name)
+        if record_data.type != "SOA":
+            validate_dns_values(record_data.type.value if hasattr(record_data.type, "value") else str(record_data.type), list(record_data.values), zone.name)
+        ensure_policy_fields(
+            str(record_data.type),
+            record_data.routing_policy.value if hasattr(record_data.routing_policy, "value") else str(record_data.routing_policy),
+            record_data.set_identifier,
+            record_data.weight,
+            record_data.region,
+            record_data.failover_role,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    ensure_policy_fields(
-        str(record_data.type),
-        record_data.routing_policy.value if hasattr(record_data.routing_policy, "value") else str(record_data.routing_policy),
-        record_data.set_identifier,
-        record_data.weight,
-        record_data.region,
-        record_data.failover_role,
-    )
+    duplicate = db.query(DNSRecord).filter(
+        DNSRecord.hosted_zone_id == zone_id,
+        DNSRecord.name == normalized_name,
+        DNSRecord.type == (record_data.type.value if hasattr(record_data.type, "value") else str(record_data.type)),
+        DNSRecord.set_identifier == record_data.set_identifier,
+        DNSRecord.id != record.id,
+    ).first()
+    if duplicate:
+        raise HTTPException(status_code=409, detail="A record with this type, name, and set identifier already exists")
 
     record.name = normalized_name
     record.type = record_data.type.value if hasattr(record_data.type, "value") else str(record_data.type)

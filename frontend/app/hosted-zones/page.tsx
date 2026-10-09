@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import TopNav from '@/components/TopNav';
 import Sidebar from '@/components/Sidebar';
@@ -9,11 +9,12 @@ import { Menu, ChevronRight, Search, RefreshCw, Settings, ChevronLeft, X } from 
 
 interface HostedZone {
   id: number;
+  zone_id: string;
   name: string;
   type: string;
   comment: string | null;
   created_at: string;
-  record_count?: number; // Might come from backend
+  record_count: number;
 }
 
 export default function HostedZonesPage() {
@@ -24,48 +25,51 @@ export default function HostedZonesPage() {
   const [selectedZone, setSelectedZone] = useState<number | null>(null);
   const [search, setSearch] = useState('');
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [totalZones, setTotalZones] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [loadError, setLoadError] = useState('');
 
-  const fetchZones = async () => {
+  const fetchZones = useCallback(async () => {
     setLoading(true);
+    setLoadError('');
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/hosted-zones/`, {
-        credentials: 'include'
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const zonesWithCounts = await Promise.all(
-          (data.items || []).map(async (zone: HostedZone & { id: number }) => {
-            try {
-              const recRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/hosted-zones/${zone.id}/records/`, { credentials: 'include' });
-              if (recRes.ok) {
-                const recData = await recRes.json();
-                return { ...zone, record_count: recData.total !== undefined ? recData.total : (recData.items?.length || 0) };
-              }
-            } catch (e) {
-              console.error(e);
-            }
-            return { ...zone, record_count: 0 };
-          })
-        );
-        setZones(zonesWithCounts);
+      const url = new URL(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/hosted-zones/`, window.location.origin);
+      url.searchParams.set('page', String(page));
+      url.searchParams.set('page_size', String(pageSize));
+      if (search.trim()) url.searchParams.set('search', search.trim());
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) {
+        if (res.status === 401) router.push('/signin');
+        throw new Error('Failed to fetch hosted zones.');
       }
-    } catch (e) {
-      console.error('Failed to fetch zones');
+      const data = await res.json();
+      setZones(data.items ?? []);
+      setTotalZones(data.total ?? 0);
+      setTotalPages(data.total_pages ?? 0);
+      setSelectedZone(current => current !== null && !(data.items ?? []).some((zone: HostedZone) => zone.id === current) ? null : current);
+    } catch {
+      setZones([]);
+      setLoadError('Unable to load hosted zones. Refresh the page and try again.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, pageSize, router, search]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchZones();
-  }, []);
-
-  const filteredZones = zones.filter(z => z.name.toLowerCase().includes(search.toLowerCase()));
+    const timer = setTimeout(() => {
+      fetchZones();
+    }, search ? 250 : 0);
+    return () => clearTimeout(timer);
+  }, [fetchZones, search]);
 
   const handleCreate = () => router.push('/hosted-zones/create');
   const handleViewDetails = () => {
     if (selectedZone) router.push(`/hosted-zones/${selectedZone}`);
+  };
+  const handleEdit = () => {
+    if (selectedZone) router.push(`/hosted-zones/${selectedZone}/edit`);
   };
 
   return (
@@ -97,7 +101,7 @@ export default function HostedZonesPage() {
             <div className="p-5 border-b border-[#2c384a]">
               <div className="flex justify-between items-start mb-2">
                 <div>
-                  <h1 className="text-white text-[20px] font-bold tracking-tight">Hosted zones <span className="font-normal">({zones.length})</span></h1>
+                  <h1 className="text-white text-[20px] font-bold tracking-tight">Hosted zones <span className="font-normal">({totalZones})</span></h1>
                   <p className="text-gray-400 text-[13px] mt-1">
                     Automatic mode is the current search behavior optimized for best filter results. <span className="text-[#3ea1fc] hover:underline cursor-pointer">To change modes go to settings.</span>
                   </p>
@@ -114,7 +118,7 @@ export default function HostedZonesPage() {
                   >
                     View details
                   </button>
-                  <button disabled className="px-4 py-1.5 border border-[#545b64] text-white font-bold rounded-full text-[13px] opacity-50 cursor-not-allowed">
+                  <button disabled={!selectedZone} onClick={handleEdit} className="px-4 py-1.5 border border-[#545b64] text-white font-bold rounded-full text-[13px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                     Edit
                   </button>
                   <button
@@ -141,15 +145,21 @@ export default function HostedZonesPage() {
                     type="text"
                     placeholder="Filter records by property or value"
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                     className="w-full bg-[#161d27] border border-[#545b64] focus:border-[#3ea1fc] focus:outline-none text-white text-[13px] rounded py-1.5 pl-9 pr-4"
                   />
                 </div>
-                <div className="flex items-center gap-4 text-gray-400 text-[13px]">
+                <div className="flex items-center gap-3 text-gray-400 text-[13px]">
+                  <label className="flex items-center gap-2">
+                    Rows
+                    <select value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }} className="bg-[#161d27] border border-[#545b64] rounded px-2 py-1 text-white">
+                      {[10, 20, 50, 100].map(size => <option key={size} value={size}>{size}</option>)}
+                    </select>
+                  </label>
                   <div className="flex items-center gap-2">
-                    <ChevronLeft size={16} className="cursor-not-allowed opacity-50" />
-                    <span className="text-white font-bold">1</span>
-                    <ChevronRight size={16} className="cursor-not-allowed opacity-50" />
+                    <button type="button" aria-label="Previous page" disabled={page <= 1 || loading} onClick={() => setPage(current => current - 1)} className="disabled:opacity-40"><ChevronLeft size={16} /></button>
+                    <span className="text-white font-bold">{totalPages ? `${page} / ${totalPages}` : '0 / 0'}</span>
+                    <button type="button" aria-label="Next page" disabled={page >= totalPages || loading} onClick={() => setPage(current => current + 1)} className="disabled:opacity-40"><ChevronRight size={16} /></button>
                   </div>
                   <Settings size={16} className="cursor-pointer hover:text-white transition-colors" />
                 </div>
@@ -175,12 +185,14 @@ export default function HostedZonesPage() {
                     <tr>
                       <td colSpan={7} className="px-4 py-8 text-center text-gray-400">Loading hosted zones...</td>
                     </tr>
-                  ) : filteredZones.length === 0 ? (
+                  ) : loadError ? (
+                    <tr><td colSpan={7} role="alert" className="px-4 py-8 text-center text-red-400">{loadError}</td></tr>
+                  ) : zones.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="px-4 py-8 text-center text-gray-400">No hosted zones found.</td>
                     </tr>
                   ) : (
-                    filteredZones.map(zone => (
+                    zones.map(zone => (
                       <tr
                         key={zone.id}
                         className={`hover:bg-[#2c384a]/30 transition-colors cursor-pointer ${selectedZone === zone.id ? 'bg-[#3ea1fc]/10' : ''}`}
@@ -208,7 +220,7 @@ export default function HostedZonesPage() {
                         <td className="px-4 py-3 border-l border-[#2c384a]">{zone.record_count !== undefined ? zone.record_count : 0}</td>
                         <td className="px-4 py-3 border-l border-[#2c384a] text-gray-300">{zone.comment || '-'}</td>
                         <td className="px-4 py-3 border-l border-[#2c384a] text-gray-300">
-                          {`Z0${String(zone.id).padStart(12, '0').slice(0, 12).toUpperCase()}`}
+                          {zone.zone_id}
                         </td>
                       </tr>
                     ))
@@ -248,7 +260,10 @@ function DeleteZoneModal({ zone, onClose, onSuccess }: { zone: HostedZone; onClo
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/hosted-zones/${zone.id}`, { method: 'DELETE', credentials: 'include' });
       if (res.ok) onSuccess();
-      else setError('Failed to delete zone.');
+      else {
+        const data = await res.json().catch(() => null);
+        setError(data?.detail || 'Failed to delete zone.');
+      }
     } catch {
       setError('Network error.');
     } finally {

@@ -36,8 +36,8 @@ export default function Sidebar() {
       <div className="flex flex-col text-[14px] font-medium">
         <Link href="/" className="py-2 pl-5 text-gray-300 hover:text-white hover:bg-[#161d27]">Dashboard</Link>
         <Link href="/hosted-zones" className={`py-2 pl-5 font-bold border-l-[3px] ${isHostedZonesActive ? 'text-[#3ea1fc] border-[#3ea1fc] bg-[#161d27]' : 'text-gray-300 border-transparent hover:text-white hover:bg-[#161d27]'}`}>Hosted zones</Link>
-        <a href="#" className="py-2 pl-5 text-gray-300 hover:text-white hover:bg-[#161d27]">Health checks</a>
-        <a href="#" className="py-2 pl-5 text-gray-300 hover:text-white hover:bg-[#161d27]">Profiles</a>
+        <Link href="/coming-soon/health-checks" className="py-2 pl-5 text-gray-300 hover:text-white hover:bg-[#161d27]">Health checks</Link>
+        <Link href="/coming-soon/profiles" className="py-2 pl-5 text-gray-300 hover:text-white hover:bg-[#161d27]">Profiles</Link>
       </div>
 
       {/* Sections */}
@@ -96,12 +96,12 @@ export default function Sidebar() {
 
       {/* External Links */}
       <div className="flex flex-col text-[14px] font-medium pb-6">
-        <a href="#" className="py-2 pl-5 text-gray-300 hover:text-white hover:bg-[#161d27] flex items-center gap-1.5">
+        <Link href="/coming-soon/dns-firewall" className="py-2 pl-5 text-gray-300 hover:text-white hover:bg-[#161d27] flex items-center gap-1.5">
           DNS Firewall <ExternalLink size={14} className="opacity-80" />
-        </a>
-        <a href="#" className="py-2 pl-5 text-gray-300 hover:text-white hover:bg-[#161d27] flex items-center gap-1.5">
+        </Link>
+        <Link href="/coming-soon/application-recovery-controller" className="py-2 pl-5 text-gray-300 hover:text-white hover:bg-[#161d27] flex items-center gap-1.5">
           Application Recovery Controller <ExternalLink size={14} className="opacity-80" />
-        </a>
+        </Link>
       </div>
     </div>
   );
@@ -139,10 +139,11 @@ function SidebarSection({
 }
 
 function SidebarItem({ label, isNew = false }: { label: string; isNew?: boolean }) {
+  const feature = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   return (
-    <a href="#" className="py-1.5 pl-[30px] pr-4 text-[13px] text-gray-300 hover:text-white hover:bg-[#161d27] flex items-center gap-2">
+    <Link href={`/coming-soon/${feature}`} className="py-1.5 pl-[30px] pr-4 text-[13px] text-gray-300 hover:text-white hover:bg-[#161d27] flex items-center gap-2">
       {label}
       {isNew && <span className="text-[#3ea1fc] font-bold text-[11px] tracking-wide">New</span>}
-    </a>
+    </Link>
   );
 }

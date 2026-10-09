@@ -72,6 +72,7 @@ class HostedZoneCreate(BaseModel):
 
 class HostedZoneUpdate(BaseModel):
     comment: str | None = Field(default=None, max_length=256)
+    tags: list[TagRequest] | None = Field(default=None, max_length=50)
 
 
 class HostedZoneResponse(BaseModel):

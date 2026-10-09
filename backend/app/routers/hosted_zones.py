@@ -45,8 +45,8 @@ def get_hosted_zones(
     zone_type: str | None = Query(default=None, alias="type"),
     sort_by: str = "created_at",
     sort_order: str = "desc",
-    page: int = 1,
-    page_size: int = 20,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
     query = db.query(HostedZone)
@@ -126,6 +126,11 @@ def update_hosted_zone(zone_id: int, zone_data: HostedZoneUpdate, user: User = D
     if zone.created_by != user.id:
         raise HTTPException(status_code=403, detail="You cannot edit another user\'s hosted zone")
     zone.comment = zone_data.comment
+    if zone_data.tags is not None:
+        for tag in list(zone.tags):
+            db.delete(tag)
+        db.flush()
+        zone.tags.extend(HostedZoneTag(key=tag.key, value=tag.value) for tag in zone_data.tags)
     db.commit()
     db.refresh(zone)
     return _serialize_zone(zone)

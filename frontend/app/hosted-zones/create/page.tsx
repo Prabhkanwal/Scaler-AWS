@@ -17,6 +17,9 @@ export default function CreateHostedZone() {
   const [domainName, setDomainName] = useState('');
   const [description, setDescription] = useState('');
   const [zoneType, setZoneType] = useState<'public' | 'private'>('public');
+  const [vpcId, setVpcId] = useState('');
+  const [vpcRegion, setVpcRegion] = useState('us-east-1');
+  const [tags, setTags] = useState<Array<{ key: string; value: string }>>([]);
 
   // UI State
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -67,6 +70,14 @@ export default function CreateHostedZone() {
       setError('Description cannot exceed 256 characters.');
       return;
     }
+    if (zoneType === 'private' && !vpcId.trim()) {
+      setError('Enter a VPC ID to associate with a private hosted zone.');
+      return;
+    }
+    if (tags.some(tag => !tag.key.trim() || !tag.value.trim())) {
+      setError('Enter both a key and value for every tag, or remove the empty tag.');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -76,7 +87,9 @@ export default function CreateHostedZone() {
         body: JSON.stringify({
           name: domainName.trim(),
           type: zoneType,
-          comment: description.trim() || null
+          comment: description.trim() || null,
+          tags: tags.map(tag => ({ key: tag.key.trim(), value: tag.value.trim() })),
+          vpcs: zoneType === 'private' ? [{ vpc_id: vpcId.trim(), vpc_region: vpcRegion }] : [],
         }),
         credentials: 'include'
       });
@@ -308,6 +321,20 @@ export default function CreateHostedZone() {
                   </div>
                 </label>
               </div>
+              {zoneType === 'private' && (
+                <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="vpc-id" className="block text-white text-[13px] font-bold mb-1">VPC ID</label>
+                    <input id="vpc-id" value={vpcId} onChange={event => setVpcId(event.target.value)} placeholder="vpc-0123456789abcdef0" required className="w-full bg-[#0f1b2a] border border-[#545b64] rounded px-3 py-2 text-white text-[13px]" />
+                  </div>
+                  <div>
+                    <label htmlFor="vpc-region" className="block text-white text-[13px] font-bold mb-1">VPC Region</label>
+                    <select id="vpc-region" value={vpcRegion} onChange={event => setVpcRegion(event.target.value)} className="w-full bg-[#0f1b2a] border border-[#545b64] rounded px-3 py-2 text-white text-[13px]">
+                      {['us-east-1', 'us-east-2', 'us-west-1', 'us-west-2', 'eu-west-1', 'eu-central-1', 'ap-southeast-1', 'ap-northeast-1'].map(region => <option key={region} value={region}>{region}</option>)}
+                    </select>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -319,9 +346,17 @@ export default function CreateHostedZone() {
             </div>
             <p className="text-white text-[13px] mb-6">Apply tags to hosted zones to help organize and identify them.</p>
 
-            <p className="text-white text-[13px] font-bold mb-4">No tags associated with the resource.</p>
-
-            <button type="button" className="bg-transparent border-[1.5px] border-[#3ea1fc] text-white hover:bg-[#3ea1fc]/10 font-bold py-1.5 px-4 rounded-full text-[13px] transition-colors mb-3">
+            {tags.length === 0 && <p className="text-white text-[13px] font-bold mb-4">No tags associated with the resource.</p>}
+            <div className="space-y-3 mb-4">
+              {tags.map((tag, index) => (
+                <div key={index} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3">
+                  <input aria-label={`Tag ${index + 1} key`} value={tag.key} maxLength={64} onChange={event => setTags(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, key: event.target.value } : item))} placeholder="Key" className="bg-[#0f1b2a] border border-[#545b64] rounded px-3 py-2 text-white text-[13px]" />
+                  <input aria-label={`Tag ${index + 1} value`} value={tag.value} maxLength={255} onChange={event => setTags(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, value: event.target.value } : item))} placeholder="Value" className="bg-[#0f1b2a] border border-[#545b64] rounded px-3 py-2 text-white text-[13px]" />
+                  <button type="button" onClick={() => setTags(current => current.filter((_, itemIndex) => itemIndex !== index))} className="text-[#3ea1fc] hover:underline text-[13px]">Remove</button>
+                </div>
+              ))}
+            </div>
+            <button type="button" disabled={tags.length >= 50} onClick={() => setTags(current => [...current, { key: '', value: '' }])} className="bg-transparent border-[1.5px] border-[#3ea1fc] text-white hover:bg-[#3ea1fc]/10 font-bold py-1.5 px-4 rounded-full text-[13px] transition-colors mb-3 disabled:opacity-50">
               Add tag
             </button>
             <p className="text-white text-[11px]">You can add up to 50 more tags.</p>
