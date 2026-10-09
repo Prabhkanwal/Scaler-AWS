@@ -72,6 +72,9 @@ export default function HostedZonesPage() {
     if (selectedZone) router.push(`/hosted-zones/${selectedZone}/edit`);
   };
 
+  // Shown as a tooltip on the action buttons while no zone is selected.
+  const selectHint = !selectedZone ? 'Select a hosted zone first' : undefined;
+
   return (
     <div className="min-h-screen bg-[#161d27] flex flex-col font-sans">
       <TopNav />
@@ -113,16 +116,23 @@ export default function HostedZonesPage() {
                   </button>
                   <button
                     disabled={!selectedZone}
+                    title={selectHint}
                     onClick={handleViewDetails}
                     className="px-4 py-1.5 border border-[#545b64] hover:border-gray-300 text-white font-bold rounded-full text-[13px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     View details
                   </button>
-                  <button disabled={!selectedZone} onClick={handleEdit} className="px-4 py-1.5 border border-[#545b64] text-white font-bold rounded-full text-[13px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                  <button
+                    disabled={!selectedZone}
+                    title={selectHint}
+                    onClick={handleEdit}
+                    className="px-4 py-1.5 border border-[#545b64] text-white font-bold rounded-full text-[13px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
                     Edit
                   </button>
                   <button
                     disabled={!selectedZone}
+                    title={selectHint}
                     onClick={() => setIsDeleteModalOpen(true)}
                     className={`px-4 py-1.5 border border-[#545b64] font-bold rounded-full text-[13px] transition-colors ${selectedZone ? 'text-white hover:border-gray-300' : 'text-white opacity-50 cursor-not-allowed'}`}
                   >
@@ -136,6 +146,13 @@ export default function HostedZonesPage() {
                   </button>
                 </div>
               </div>
+
+              {/* Selection hint: visible only until a zone is selected */}
+              {!selectedZone && !loading && !loadError && zones.length > 0 && (
+                <p className="text-[#3ea1fc] text-[13px] mt-3">
+                  Select a hosted zone using the radio button on its row to enable View details, Edit, or Delete.
+                </p>
+              )}
 
               {/* Search and Pagination */}
               <div className="flex justify-between items-center mt-4">
@@ -171,7 +188,7 @@ export default function HostedZonesPage() {
               <table className="w-full text-left text-[13px] whitespace-nowrap">
                 <thead className="bg-[#161d27] text-gray-400 border-b border-[#2c384a]">
                   <tr>
-                    <th className="w-12 px-4 py-3 font-bold text-center"></th>
+                    <th className="w-12 px-4 py-3 font-bold text-center" title="Select a hosted zone"></th>
                     <th className="px-4 py-3 font-bold border-l border-[#2c384a] cursor-pointer hover:text-white">Hosted zone name <span className="text-[10px] ml-1">▼</span></th>
                     <th className="px-4 py-3 font-bold border-l border-[#2c384a] cursor-pointer hover:text-white">Type <span className="text-[10px] ml-1">▼</span></th>
                     <th className="px-4 py-3 font-bold border-l border-[#2c384a] cursor-pointer hover:text-white">Created by <span className="text-[10px] ml-1">▼</span></th>
@@ -202,6 +219,7 @@ export default function HostedZonesPage() {
                           <input
                             type="radio"
                             name="selectedZone"
+                            aria-label={`Select ${zone.name}`}
                             checked={selectedZone === zone.id}
                             onChange={() => setSelectedZone(zone.id)}
                             className="cursor-pointer accent-[#3ea1fc]"
