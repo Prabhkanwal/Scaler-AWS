@@ -39,6 +39,9 @@ def _serialize_record(record: DNSRecord) -> DNSRecordResponse:
     )
 
 
+# FIX: register the list route with AND without the trailing slash so the
+# Vercel proxy never triggers a 307 redirect to an http:// URL.
+@router.get("", response_model=DNSRecordListResponse, include_in_schema=False)
 @router.get("/", response_model=DNSRecordListResponse)
 def list_records(
     zone_id: int,
@@ -97,6 +100,8 @@ def get_record(zone_id: int, record_id: int, db: Session = Depends(get_db)) -> D
     return _serialize_record(record)
 
 
+# FIX: same as above for create. This is the route behind "Create records".
+@router.post("", response_model=DNSRecordResponse, status_code=201, include_in_schema=False)
 @router.post("/", response_model=DNSRecordResponse, status_code=201)
 def create_record(zone_id: int, record_data: DNSRecordCreate, db: Session = Depends(get_db)) -> DNSRecordResponse:
     zone = db.query(HostedZone).filter(HostedZone.id == zone_id).first()
@@ -110,21 +115,11 @@ def create_record(zone_id: int, record_data: DNSRecordCreate, db: Session = Depe
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
+    # (A second, identical ensure_policy_fields block that used str(record_data.type)
+    # was removed: it repeated this check and could only add false failures.)
     try:
         ensure_policy_fields(
             record_data.type.value if hasattr(record_data.type, "value") else str(record_data.type),
-            record_data.routing_policy.value if hasattr(record_data.routing_policy, "value") else str(record_data.routing_policy),
-            record_data.set_identifier,
-            record_data.weight,
-            record_data.region,
-            record_data.failover_role,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-    try:
-        ensure_policy_fields(
-            str(record_data.type),
             record_data.routing_policy.value if hasattr(record_data.routing_policy, "value") else str(record_data.routing_policy),
             record_data.set_identifier,
             record_data.weight,
